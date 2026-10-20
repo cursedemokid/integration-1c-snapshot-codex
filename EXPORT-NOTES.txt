@@ -1,0 +1,6 @@
+An anonymized source snapshot prepared for public sharing.
+
+Git history, credentials, personal names and contacts, operational hosts and identifiers, machine settings, private documents, runtime data, logs, exports, and original brand media are excluded or replaced.
+Media placeholders are neutral; excluded manuals and video must be supplied separately.
+Configure your own credentials and service settings before running. Demo values are not operational.
+This snapshot has undergone static validation; it has not been tested against live services.
