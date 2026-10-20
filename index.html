@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Сверка документов 1С</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f4f6f8;
+            color: #1f2937;
+        }
+        main {
+            max-width: 760px;
+            margin: 48px auto;
+            padding: 32px;
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+        }
+        form {
+            display: grid;
+            gap: 16px;
+        }
+        label {
+            display: grid;
+            gap: 6px;
+            font-weight: 600;
+        }
+        input, button {
+            font: inherit;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+        }
+        button {
+            border: 0;
+            background: #2563eb;
+            color: #ffffff;
+            cursor: pointer;
+            font-weight: 700;
+        }
+        button.secondary {
+            background: #e2e8f0;
+            color: #1f2937;
+        }
+        button:disabled {
+            background: #94a3b8;
+            cursor: wait;
+        }
+        fieldset {
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            padding: 14px;
+        }
+        legend {
+            padding: 0 6px;
+            font-weight: 700;
+        }
+        .warehouse-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 12px;
+        }
+        .warehouse-list {
+            display: grid;
+            gap: 8px;
+            max-height: 220px;
+            overflow: auto;
+        }
+        .warehouse-item {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            align-items: start;
+            gap: 8px;
+            font-weight: 400;
+        }
+        .warehouse-item input {
+            width: auto;
+        }
+        .muted {
+            color: #64748b;
+        }
+        .warehouse-meta {
+            display: block;
+            margin-top: 3px;
+            color: #64748b;
+            font-size: 13px;
+            line-height: 1.35;
+        }
+        #status, #warehouse-status {
+            min-height: 24px;
+            margin-top: 10px;
+        }
+        #warehouse-diagnostics {
+            margin-top: 10px;
+            color: #64748b;
+            font-size: 13px;
+        }
+        #warehouse-diagnostics summary {
+            cursor: pointer;
+            user-select: none;
+        }
+        #warehouse-warnings {
+            margin-top: 8px;
+            padding: 10px 12px;
+            border-left: 3px solid #94a3b8;
+            background: #f8fafc;
+            color: #475569;
+            line-height: 1.4;
+        }
+        #warehouse-warnings p {
+            margin: 0 0 8px;
+        }
+        #warehouse-warnings p:last-child,
+        #warehouse-warnings ul:last-child {
+            margin-bottom: 0;
+        }
+        #warehouse-warnings ul {
+            margin: 4px 0 8px;
+            padding-left: 20px;
+        }
+        .error {
+            color: #b91c1c;
+        }
+        .success {
+            color: #047857;
+        }
+        .download-link {
+            display: inline-block;
+            margin-top: 8px;
+            color: #1d4ed8;
+            font-weight: 700;
+        }
+        .download-link[hidden] {
+            display: none;
+        }
+        @media (max-width: 640px) {
+            main {
+                margin: 0;
+                padding: 24px 16px;
+                border-radius: 0;
+                box-shadow: none;
+            }
+            h1 {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Сверка документов 1С</h1>
+    <p>Укажите начальную и конечную дату периода включительно и выберите один или несколько складов.</p>
+
+    <form id="reconcile-form">
+        <label>
+            Начальная дата
+            <input id="start-date" name="start_date" type="date" required>
+        </label>
+        <label>
+            Конечная дата
+            <input id="end-date" name="end_date" type="date" required>
+        </label>
+
+        <fieldset>
+            <legend>Склады</legend>
+            <p class="muted">Склады УТ объединяются по связанному складу бухгалтерии.</p>
+            <div class="warehouse-actions">
+                <button id="select-all-warehouses" class="secondary" type="button" disabled>Выбрать все</button>
+                <button id="clear-warehouses" class="secondary" type="button" disabled>Снять выбор</button>
+            </div>
+            <div id="warehouse-list" class="warehouse-list"></div>
+            <div id="warehouse-status" class="muted" role="status"></div>
+            <details id="warehouse-diagnostics" hidden>
+                <summary id="warehouse-diagnostics-summary">Диагностика справочников</summary>
+                <div id="warehouse-warnings"></div>
+            </details>
+        </fieldset>
+
+        <button id="submit" type="submit" disabled>Сформировать список исправлений</button>
+    </form>
+
+    <div id="status" role="status"></div>
+    <a id="download-report" class="download-link" href="#" hidden>Скачать Excel повторно</a>
+</main>
+
+<script>
+    const form = document.getElementById("reconcile-form");
+    const statusNode = document.getElementById("status");
+    const submitButton = document.getElementById("submit");
+    const startDateInput = document.getElementById("start-date");
+    const endDateInput = document.getElementById("end-date");
+    const warehouseList = document.getElementById("warehouse-list");
+    const warehouseStatus = document.getElementById("warehouse-status");
+    const warehouseDiagnostics = document.getElementById("warehouse-diagnostics");
+    const warehouseDiagnosticsSummary = document.getElementById("warehouse-diagnostics-summary");
+    const warehouseWarnings = document.getElementById("warehouse-warnings");
+    const selectAllWarehousesButton = document.getElementById("select-all-warehouses");
+    const clearWarehousesButton = document.getElementById("clear-warehouses");
+    const downloadReportLink = document.getElementById("download-report");
+    let warehousesReady = false;
+    let reconciliationRunning = false;
+    let reportUrl = null;
+    let reconciliationStartedAt = null;
+    let reconciliationTimer = null;
+
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    startDateInput.value = formatDate(firstDayOfMonth);
+    endDateInput.value = formatDate(today);
+
+    loadWarehouses();
+
+    selectAllWarehousesButton.addEventListener("click", () => {
+        getWarehouseCheckboxes().forEach((checkbox) => checkbox.checked = true);
+        updateWarehouseSelectionState();
+    });
+
+    clearWarehousesButton.addEventListener("click", () => {
+        getWarehouseCheckboxes().forEach((checkbox) => checkbox.checked = false);
+        updateWarehouseSelectionState();
+    });
+
+    warehouseList.addEventListener("change", updateWarehouseSelectionState);
+    window.addEventListener("beforeunload", releaseReportUrl);
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        statusNode.className = "";
+        statusNode.textContent = "Выполняется сверка...";
+
+        try {
+            if (window.location.protocol === "file:") {
+                throw new Error("Откройте форму через сервер: http://127.0.0.1:8000/, а не как локальный HTML-файл.");
+            }
+
+            if (!startDateInput.value || !endDateInput.value) {
+                throw new Error("Укажите начальную и конечную дату.");
+            }
+            if (endDateInput.value < startDateInput.value) {
+                throw new Error("Конечная дата должна быть больше или равна начальной дате.");
+            }
+            const selectedWarehouses = getSelectedWarehouses();
+            if (!warehousesReady || !selectedWarehouses.length) {
+                throw new Error("Выберите хотя бы один сопоставленный склад.");
+            }
+
+            const request = {
+                start_date: startDateInput.value,
+                end_date: endDateInput.value,
+                warehouses: selectedWarehouses
+            };
+            setReconciliationRunning(true);
+            startReconciliationTimer();
+
+            const response = await fetch("/reconcile", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify(request)
+            });
+
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response));
+            }
+
+            const blob = await response.blob();
+            const previousReportUrl = reportUrl;
+            reportUrl = URL.createObjectURL(blob);
+            downloadReportLink.href = reportUrl;
+            downloadReportLink.download = getReportFilename(response, request);
+            downloadReportLink.hidden = false;
+            downloadReportLink.click();
+            if (previousReportUrl) {
+                URL.revokeObjectURL(previousReportUrl);
+            }
+
+            const uncheckedBaseCount = Number(response.headers.get("X-Unchecked-Base-Count") || 0);
+            statusNode.className = uncheckedBaseCount ? "error" : "success";
+            statusNode.textContent = uncheckedBaseCount
+                ? `Отчет скачан. Не проверено баз: ${uncheckedBaseCount}. Причины указаны в Excel.`
+                : "Список исправлений сформирован. Excel-файл скачан.";
+        } catch (error) {
+            statusNode.className = "error";
+            statusNode.textContent = error.message;
+        } finally {
+            stopReconciliationTimer();
+            setReconciliationRunning(false);
+        }
+    });
+
+    async function loadWarehouses() {
+        warehouseStatus.className = "muted";
+        warehouseStatus.textContent = "Загрузка списка складов...";
+        try {
+            const response = await fetch("/warehouses");
+            if (!response.ok) {
+                throw new Error(await readErrorMessage(response));
+            }
+            const payload = await response.json();
+            const warehouses = Array.isArray(payload.warehouses) ? payload.warehouses : [];
+            const baseNames = Object.fromEntries(
+                (Array.isArray(payload.bases) ? payload.bases : [])
+                    .map((base) => [base.id, base.name])
+            );
+            renderWarehouses(warehouses, baseNames, payload.mapping_diagnostics || {});
+        } catch (error) {
+            warehousesReady = false;
+            warehouseList.innerHTML = "";
+            warehouseDiagnostics.hidden = true;
+            warehouseWarnings.replaceChildren();
+            warehouseStatus.className = "error";
+            warehouseStatus.textContent = `Список складов не загружен: ${error.message}. Сверка недоступна.`;
+            updateControlState();
+        }
+    }
+
+    function renderWarehouses(warehouses, baseNames, diagnostics) {
+        warehouseList.innerHTML = "";
+        renderMappingDiagnostics(diagnostics, baseNames);
+        if (!warehouses.length) {
+            warehousesReady = false;
+            warehouseStatus.className = "error";
+            warehouseStatus.textContent = "Нет настроенных соответствий складов. Сверка недоступна.";
+            updateControlState();
+            return;
+        }
+
+        for (const warehouse of warehouses) {
+            const id = `warehouse-${warehouse.id}`;
+            const label = document.createElement("label");
+            label.className = "warehouse-item";
+
+            const checkbox = document.createElement("input");
+            checkbox.type = "checkbox";
+            checkbox.value = warehouse.id;
+            checkbox.id = id;
+            checkbox.checked = true;
+
+            const description = document.createElement("span");
+            const text = document.createElement("span");
+            text.textContent = warehouse.label;
+            const meta = document.createElement("span");
+            meta.className = "warehouse-meta";
+            meta.textContent = Object.entries(warehouse.sources || {})
+                .map(([baseId, sources]) => {
+                    const sourceList = Array.isArray(sources) ? sources : [sources];
+                    const baseName = baseNames[baseId] || baseId;
+                    if (baseId === "trade" && sourceList.length > 3) {
+                        return `${baseName}: ${sourceList.length} складов`;
+                    }
+                    return `${baseName}: ${sourceList.map(source => `${source.code} — ${source.name}`).join(", ")}`;
+                })
+                .join("; ");
+            meta.title = Object.entries(warehouse.sources || {})
+                .map(([baseId, sources]) => {
+                    const sourceList = Array.isArray(sources) ? sources : [sources];
+                    const baseName = baseNames[baseId] || baseId;
+                    return `${baseName}: ${sourceList.map(source => `${source.code} — ${source.name}`).join(", ")}`;
+                })
+                .join("; ");
+            description.appendChild(text);
+            description.appendChild(meta);
+
+            label.appendChild(checkbox);
+            label.appendChild(description);
+            warehouseList.appendChild(label);
+        }
+
+        warehousesReady = true;
+        updateWarehouseSelectionState();
+    }
+
+    function renderMappingDiagnostics(diagnostics, baseNames) {
+        const mappedLogical = Number(diagnostics.mapped_logical_count || 0);
+        const mappedTrade = Number(diagnostics.mapped_trade_count || 0);
+        const blank = Number(diagnostics.blank_trade_count || 0);
+        const unresolved = Number(diagnostics.unresolved_trade_count || 0);
+        const unresolvedLinks = Array.isArray(diagnostics.unresolved_links)
+            ? diagnostics.unresolved_links
+            : [];
+        const unreferenced = Array.isArray(diagnostics.unreferenced_accounting)
+            ? diagnostics.unreferenced_accounting
+            : [];
+
+        warehouseWarnings.replaceChildren();
+        warehouseDiagnostics.hidden = !(blank || unresolved || unreferenced.length);
+        if (warehouseDiagnostics.hidden) {
+            return;
+        }
+
+        warehouseDiagnosticsSummary.textContent =
+            `Диагностика справочников — сверяются ${mappedLogical} групп (${mappedTrade} складов УТ)`;
+
+        if (blank) {
+            appendDiagnostic(
+                `${blank} складов УТ не заполнено поле «СкладБухгалтерия». ` +
+                "Они не показываются в выборе складов."
+            );
+        }
+        if (unresolved) {
+            appendDiagnostic(
+                `${unresolved} складов УТ с заполненной связью объединены в ` +
+                `${unresolvedLinks.length} названий, которых нет во всех бухгалтерских базах:`
+            );
+            const list = document.createElement("ul");
+            unresolvedLinks.forEach((issue) => {
+                const item = document.createElement("li");
+                const missingBases = (issue.missing_bases || [])
+                    .map((baseId) => baseNames[baseId] || baseId)
+                    .join(", ");
+                item.textContent = `${issue.accounting_name} — ${issue.trade_count} складов УТ; нет в ${missingBases}`;
+                list.appendChild(item);
+            });
+            warehouseWarnings.appendChild(list);
+        }
+        if (unreferenced.length) {
+            const countsByBase = unreferenced.reduce((counts, item) => {
+                counts[item.base_id] = (counts[item.base_id] || 0) + 1;
+                return counts;
+            }, {});
+            const counts = Object.entries(countsByBase)
+                .map(([baseId, count]) => `${baseNames[baseId] || baseId}: ${count}`)
+                .join("; ");
+            appendDiagnostic(
+                `В бухгалтерских справочниках есть склады, на которые не ссылается УТ (${counts}). ` +
+                "Они также не показываются в выборе."
+            );
+        }
+    }
+
+    function appendDiagnostic(text) {
+        const paragraph = document.createElement("p");
+        paragraph.textContent = text;
+        warehouseWarnings.appendChild(paragraph);
+    }
+
+    function getWarehouseCheckboxes() {
+        return Array.from(warehouseList.querySelectorAll("input[type='checkbox']"));
+    }
+
+    function getSelectedWarehouses() {
+        return getWarehouseCheckboxes()
+            .filter((checkbox) => checkbox.checked)
+            .map((checkbox) => checkbox.value);
+    }
+
+    function updateWarehouseSelectionState() {
+        const selected = getSelectedWarehouses().length;
+        warehouseStatus.className = selected ? "success" : "error";
+        warehouseStatus.textContent = selected
+            ? `Выбрано складов: ${selected}.`
+            : "Выберите хотя бы один склад.";
+        updateControlState();
+    }
+
+    function updateControlState() {
+        const checkboxes = getWarehouseCheckboxes();
+        const selectionAvailable = warehousesReady && checkboxes.length > 0;
+        startDateInput.disabled = reconciliationRunning;
+        endDateInput.disabled = reconciliationRunning;
+        checkboxes.forEach((checkbox) => checkbox.disabled = reconciliationRunning);
+        selectAllWarehousesButton.disabled = reconciliationRunning || !selectionAvailable;
+        clearWarehousesButton.disabled = reconciliationRunning || !selectionAvailable;
+        submitButton.disabled = reconciliationRunning || !selectionAvailable || !getSelectedWarehouses().length;
+    }
+
+    function setReconciliationRunning(running) {
+        reconciliationRunning = running;
+        updateControlState();
+    }
+
+    function startReconciliationTimer() {
+        stopReconciliationTimer();
+        reconciliationStartedAt = Date.now();
+        updateReconciliationTimer();
+        reconciliationTimer = window.setInterval(updateReconciliationTimer, 1000);
+    }
+
+    function updateReconciliationTimer() {
+        if (!reconciliationStartedAt) {
+            return;
+        }
+        const elapsedSeconds = Math.floor((Date.now() - reconciliationStartedAt) / 1000);
+        const minutes = Math.floor(elapsedSeconds / 60);
+        const seconds = String(elapsedSeconds % 60).padStart(2, "0");
+        const explanation = elapsedSeconds >= 120
+            ? " 1С обрабатывает большой объём данных; запрос продолжает выполняться."
+            : "";
+        statusNode.textContent = `Выполняется сверка — ${minutes}:${seconds}.${explanation}`;
+    }
+
+    function stopReconciliationTimer() {
+        if (reconciliationTimer) {
+            window.clearInterval(reconciliationTimer);
+            reconciliationTimer = null;
+        }
+        reconciliationStartedAt = null;
+    }
+
+    function getReportFilename(response, request) {
+        const disposition = response.headers.get("content-disposition") || "";
+        const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+            try {
+                return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ""));
+            } catch {
+                // Fall back to the ASCII filename when the header is malformed.
+            }
+        }
+        const match = disposition.match(/filename="?([^";]+)"?/i);
+        return match?.[1]
+            || `Список_документов_для_исправления_${request.start_date}_${request.end_date}.xlsx`;
+    }
+
+    function releaseReportUrl() {
+        if (reportUrl) {
+            URL.revokeObjectURL(reportUrl);
+            reportUrl = null;
+        }
+    }
+
+    async function readErrorMessage(response) {
+        const contentType = response.headers.get("content-type") || "";
+
+        if (contentType.includes("application/json")) {
+            try {
+                const error = await response.json();
+                return error.detail || error.message || `Ошибка выполнения сверки: HTTP ${response.status}`;
+            } catch {
+                return `Ошибка выполнения сверки: HTTP ${response.status}. Сервер вернул некорректный JSON.`;
+            }
+        }
+
+        const text = await response.text();
+        const looksLikeHtml = text.trim().toLowerCase().startsWith("<!doctype")
+            || text.trim().toLowerCase().startsWith("<html");
+
+        if (looksLikeHtml) {
+            return `Сервер вернул HTML вместо JSON/Excel: HTTP ${response.status}. Проверьте, что приложение запущено через uvicorn и форма открыта по адресу http://127.0.0.1:8000/.`;
+        }
+
+        const message = text.trim();
+        if (message === "Internal Server Error") {
+            return "Не удалось сформировать Excel-отчёт из-за внутренней ошибки. Перезапустите приложение и повторите запрос.";
+        }
+
+        return message || `Ошибка выполнения сверки: HTTP ${response.status}`;
+    }
+
+    function formatDate(date) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const day = String(date.getDate()).padStart(2, "0");
+        return `${year}-${month}-${day}`;
+    }
+</script>
+</body>
+</html>

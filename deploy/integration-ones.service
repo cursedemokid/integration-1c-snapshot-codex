@@ -1,0 +1,27 @@
+[Unit]
+Description=IntegrationOneS reconciliation service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=integration-ones
+Group=integration-ones
+WorkingDirectory=/opt/integration-ones
+Environment=HOST=service.example.invalid
+Environment=PORT=8000
+Environment=WORKERS=1
+ExecStart=/bin/bash /opt/integration-ones/run.sh
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
+# Одна сверка держит в памяти всю выгрузку УТ и обеих бухгалтерских баз.
+# Шесть одновременных сверок поднимали RSS с 50 МБ до 283 МБ, поэтому у
+# процесса должен быть потолок: MemoryHigh притормаживает, MemoryMax режет.
+MemoryHigh=768M
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target
