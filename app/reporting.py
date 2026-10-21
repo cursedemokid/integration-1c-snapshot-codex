@@ -819,7 +819,7 @@ def _sheet_xml(
     )
 
     return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<worksheet xmlns="http://internal.internal.example.invalid/spreadsheetml/2006/main">
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <dimension ref="A1:{last_column}{last_row}"/>
   <sheetViews><sheetView workbookViewId="0"><pane ySplit="{freeze_rows}" topLeftCell="A{freeze_rows + 1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
   <sheetFormatPr defaultRowHeight="15"/>
@@ -857,7 +857,7 @@ def _content_types_xml(sheet_count: int) -> str:
         for index in range(1, sheet_count + 1)
     )
     return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://internal.internal.example.invalid/package/2006/content-types">
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
   <Default Extension="xml" ContentType="application/xml"/>
   <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
@@ -870,16 +870,16 @@ def _content_types_xml(sheet_count: int) -> str:
 
 def _root_rels_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://internal.internal.example.invalid/package/2006/relationships">
-  <Relationship Id="rId1" Type="http://internal.internal.example.invalid/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
-  <Relationship Id="rId2" Type="http://internal.internal.example.invalid/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
-  <Relationship Id="rId3" Type="http://internal.internal.example.invalid/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>
+  <Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/extended-properties" Target="docProps/app.xml"/>
 </Relationships>'''
 
 
 def _core_xml(timestamp: str) -> str:
     return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<cp:coreProperties xmlns:cp="http://internal.internal.example.invalid/package/2006/metadata/core-properties" xmlns:dc="http://internal.example.invalid/dc/elements/1.1/" xmlns:dcterms="http://internal.example.invalid/dc/terms/" xmlns:xsi="http://internal.example.invalid/2001/XMLSchema-instance">
+<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
   <dc:creator>IntegrationOneS</dc:creator>
   <cp:lastModifiedBy>IntegrationOneS</cp:lastModifiedBy>
   <dcterms:created xsi:type="dcterms:W3CDTF">{timestamp}</dcterms:created>
@@ -889,7 +889,7 @@ def _core_xml(timestamp: str) -> str:
 
 def _app_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Properties xmlns="http://internal.internal.example.invalid/officeDocument/2006/extended-properties" xmlns:vt="http://internal.internal.example.invalid/officeDocument/2006/docPropsVTypes">
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes">
   <Application>IntegrationOneS</Application>
 </Properties>'''
 
@@ -900,7 +900,7 @@ def _workbook_xml(sheet_names: list[str]) -> str:
         for index, name in enumerate(sheet_names, start=1)
     )
     return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<workbook xmlns="http://internal.internal.example.invalid/spreadsheetml/2006/main" xmlns:r="http://internal.internal.example.invalid/officeDocument/2006/relationships">
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
   <sheets>{sheets}</sheets>
 </workbook>'''
 
@@ -908,21 +908,21 @@ def _workbook_xml(sheet_names: list[str]) -> str:
 def _workbook_rels_xml(sheet_count: int) -> str:
     worksheets = "".join(
         f'<Relationship Id="rId{index}" '
-        'Type="http://internal.internal.example.invalid/officeDocument/2006/relationships/worksheet" '
+        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" '
         f'Target="worksheets/sheet{index}.xml"/>'
         for index in range(1, sheet_count + 1)
     )
     styles_id = sheet_count + 1
     return f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://internal.internal.example.invalid/package/2006/relationships">
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
   {worksheets}
-  <Relationship Id="rId{styles_id}" Type="http://internal.internal.example.invalid/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+  <Relationship Id="rId{styles_id}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
 </Relationships>'''
 
 
 def _styles_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<styleSheet xmlns="http://internal.internal.example.invalid/spreadsheetml/2006/main">
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
   <numFmts count="1"><numFmt numFmtId="164" formatCode="0.00########"/></numFmts>
   <fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font></fonts>
   <fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF245B78"/><bgColor indexed="64"/></patternFill></fill></fills>

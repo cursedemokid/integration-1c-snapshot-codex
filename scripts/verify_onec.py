@@ -111,7 +111,7 @@ def period_balances(rows):
 
 
 def workbook_rows(content):
-    namespace = {"s": "http://internal.internal.example.invalid/spreadsheetml/2006/main"}
+    namespace = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
     with zipfile.ZipFile(io.BytesIO(content)) as archive:
         workbook = ET.fromstring(archive.read("xl/workbook.xml"))
         sheet_names = [sheet.attrib["name"] for sheet in workbook.findall("s:sheets/s:sheet", namespace)]
