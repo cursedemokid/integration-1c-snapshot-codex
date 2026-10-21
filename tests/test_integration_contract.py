@@ -609,7 +609,7 @@ class EndpointContractTests(TestCase):
         self.assertEqual(status, 200)
         self.assertEqual([call.kwargs["json"]["warehouse"] for call in get.call_args_list[3:]], ["T1", "B1", "B1"])
         with zipfile.ZipFile(io.BytesIO(body)) as workbook:
-            ns = {"s": "http://internal.internal.example.invalid/spreadsheetml/2006/main"}
+            ns = {"s": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
             sheet = ET.fromstring(workbook.read("xl/worksheets/sheet3.xml"))
             cells = {cell.attrib["r"]: cell for cell in sheet.findall(".//s:c", ns)}
             self.assertEqual(cells["B2"].find("s:is/s:t", ns).text, "BUH2026")

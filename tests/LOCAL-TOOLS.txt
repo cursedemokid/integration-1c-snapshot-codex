@@ -1,0 +1,1 @@
+The application tests and report verification run on a clean checkout. Pilot capture/audit suites require optional workstation-only scripts not distributed in this repository; unittest explicitly reports those suites as skipped. No live 1C credentials or captured customer data are needed by the portable suite.
